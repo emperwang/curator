@@ -129,10 +129,12 @@ public class LockInternals
     {
         return client;
     }
-
+    // 返回争用此锁的 内部的节点路径
     public static Collection<String> getParticipantNodes(CuratorFramework client, final String basePath, String lockName, LockInternalsSorter sorter) throws Exception
     {
+        // 获取争用的子节点
         List<String>        names = getSortedChildren(client, basePath, lockName, sorter);
+        // 把子节点转换为 路径
         Iterable<String>    transformed = Iterables.transform
             (
                 names,

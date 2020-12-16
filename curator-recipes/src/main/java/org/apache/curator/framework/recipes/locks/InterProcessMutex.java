@@ -122,6 +122,7 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
      *
      * @return true/false
      */
+    // 判断一个锁是否被 一个线程占用
     @Override
     public boolean isAcquiredInThisProcess()
     {
@@ -178,6 +179,7 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
      * @return list of nodes
      * @throws Exception ZK errors, interruptions, etc.
      */
+    // 获取争用此锁的 内部路径
     public Collection<String> getParticipantNodes() throws Exception
     {
         return LockInternals.getParticipantNodes(internals.getClient(), basePath, internals.getLockName(), internals.getDriver());
@@ -209,10 +211,12 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
         // LockInternals 真正对锁的操作
         internals = new LockInternals(client, driver, path, lockName, maxLeases);
     }
-
+    // 判断此锁是否被当前线程占用
     boolean isOwnedByCurrentThread()
     {
+        // 获取当前线程的锁信息
         LockData lockData = threadData.get(Thread.currentThread());
+        // 根据所信息类判断是否占用
         return (lockData != null) && (lockData.lockCount.get() > 0);
     }
 
@@ -223,6 +227,7 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
 
     protected String getLockPath()
     {
+        // 获取当前锁的 占用path
         LockData lockData = threadData.get(Thread.currentThread());
         return lockData != null ? lockData.lockPath : null;
     }
