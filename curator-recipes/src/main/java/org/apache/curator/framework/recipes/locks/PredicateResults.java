@@ -25,7 +25,9 @@ public class PredicateResults
 
     public PredicateResults(String pathToWatch, boolean getsTheLock)
     {
+        // 要监听的路径
         this.pathToWatch = pathToWatch;
+        // 是否获取到锁
         this.getsTheLock = getsTheLock;
     }
 

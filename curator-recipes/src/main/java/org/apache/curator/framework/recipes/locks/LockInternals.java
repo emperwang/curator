@@ -119,7 +119,9 @@ public class LockInternals
 
     void releaseLock(String lockPath) throws Exception
     {
+        //
         revocable.set(null);
+        // 删除对应的 锁节点
         deleteOurPath(lockPath);
     }
 
@@ -197,7 +199,7 @@ public class LockInternals
     {
         return driver;
     }
-
+    // 尝试获取锁
     String attemptLock(long time, TimeUnit unit, byte[] lockNodeBytes) throws Exception
     {
         final long      startMillis = System.currentTimeMillis();
@@ -214,13 +216,16 @@ public class LockInternals
 
             try
             {
+                // 创建EPHEMERAL_SEQUENTIAL 类型的序列节点
                 ourPath = driver.createsTheLock(client, path, localLockNodeBytes);
+                // 尝试获取锁, 没有获取到,会进行wait等待
                 hasTheLock = internalLockLoop(startMillis, millisToWait, ourPath);
             }
             catch ( KeeperException.NoNodeException e )
             {
                 // gets thrown by StandardLockInternalsDriver when it can't find the lock node
                 // this can happen when the session expires, etc. So, if the retry allows, just try it all again
+                // 尝试策略
                 if ( client.getZookeeperClient().getRetryPolicy().allowRetry(retryCount++, System.currentTimeMillis() - startMillis, RetryLoop.getDefaultRetrySleeper()) )
                 {
                     isDone = false;
@@ -259,7 +264,7 @@ public class LockInternals
             }
         }
     }
-
+    // 判断是否获取到锁
     private boolean internalLockLoop(long startMillis, Long millisToWait, String ourPath) throws Exception
     {
         boolean     haveTheLock = false;
@@ -273,16 +278,20 @@ public class LockInternals
 
             while ( (client.getState() == CuratorFrameworkState.STARTED) && !haveTheLock )
             {
+                // 获取对应的path下的序列号节点
                 List<String>        children = getSortedChildren();
+                // 序列号排序
                 String              sequenceNodeName = ourPath.substring(basePath.length() + 1); // +1 to include the slash
-
+                // 判断是否获取到锁
                 PredicateResults    predicateResults = driver.getsTheLock(client, children, sequenceNodeName, maxLeases);
+                // 如果获取到锁 ,则 haveTheLock赋值为 true
                 if ( predicateResults.getsTheLock() )
                 {
                     haveTheLock = true;
                 }
                 else
                 {
+                    // 获取要监听的节点位置
                     String  previousSequencePath = basePath + "/" + predicateResults.getPathToWatch();
 
                     synchronized(this)
@@ -290,7 +299,9 @@ public class LockInternals
                         try 
                         {
                             // use getData() instead of exists() to avoid leaving unneeded watchers which is a type of resource leak
+                            // 监听
                             client.getData().usingWatcher(watcher).forPath(previousSequencePath);
+                            // 如果设置了等待时间
                             if ( millisToWait != null )
                             {
                                 millisToWait -= (System.currentTimeMillis() - startMillis);
@@ -300,11 +311,12 @@ public class LockInternals
                                     doDelete = true;    // timed out - delete our node
                                     break;
                                 }
-
+                                // 则进行有超时的等待
                                 wait(millisToWait);
                             }
                             else
                             {
+                                // 否则 一直等待
                                 wait();
                             }
                         }
@@ -324,6 +336,8 @@ public class LockInternals
         }
         finally
         {
+            // 判断是否删除自己的节点
+            // 1.如果超时,则删除自己的节点,即放弃获取锁
             if ( doDelete )
             {
                 deleteOurPath(ourPath);

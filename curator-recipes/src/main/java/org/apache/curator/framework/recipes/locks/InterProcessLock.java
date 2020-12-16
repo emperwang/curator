@@ -19,7 +19,9 @@
 package org.apache.curator.framework.recipes.locks;
 
 import java.util.concurrent.TimeUnit;
-
+/*
+  锁操作的接口
+ */
 public interface InterProcessLock
 {
     /**

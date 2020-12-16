@@ -39,13 +39,18 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
 {
     private final LockInternals internals;
     private final String basePath;
-
+    // 存储每个线程对应的 索引信息
     private final ConcurrentMap<Thread, LockData> threadData = Maps.newConcurrentMap();
-
+    /*
+        内部类,存储对应的获取锁的信息
+     */
     private static class LockData
     {
+        // 线程
         final Thread owningThread;
+        // 占用的线程
         final String lockPath;
+        // 重入次数
         final AtomicInteger lockCount = new AtomicInteger(1);
 
         private LockData(Thread owningThread, String lockPath)
@@ -54,13 +59,14 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
             this.lockPath = lockPath;
         }
     }
-
+    // lock锁的前缀
     private static final String LOCK_NAME = "lock-";
 
     /**
      * @param client client
      * @param path   the path to lock
      */
+    // 构造函数
     public InterProcessMutex(CuratorFramework client, String path)
     {
         this(client, path, new StandardLockInternalsDriver());
@@ -71,6 +77,7 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
      * @param path   the path to lock
      * @param driver lock driver
      */
+    // 初始化
     public InterProcessMutex(CuratorFramework client, String path, LockInternalsDriver driver)
     {
         this(client, path, LOCK_NAME, 1, driver);
@@ -86,6 +93,8 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
     @Override
     public void acquire() throws Exception
     {
+        // 获取锁
+        // 没有获取到锁,则抛出错误
         if ( !internalLock(-1, null) )
         {
             throw new IOException("Lost connection while trying to acquire lock: " + basePath);
@@ -125,6 +134,7 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
      *
      * @throws Exception ZK errors, interruptions, current thread does not own the lock
      */
+    // 释放锁的操作
     @Override
     public void release() throws Exception
     {
@@ -132,15 +142,16 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
             Note on concurrency: a given lockData instance
             can be only acted on by a single thread so locking isn't necessary
          */
-
+        // 获取当前线程对应的锁信息
         Thread currentThread = Thread.currentThread();
         LockData lockData = threadData.get(currentThread);
         if ( lockData == null )
         {
             throw new IllegalMonitorStateException("You do not own the lock: " + basePath);
         }
-
+        // 进行锁重入的释放
         int newLockCount = lockData.lockCount.decrementAndGet();
+        // 重入次数还大于0,说明还占有锁
         if ( newLockCount > 0 )
         {
             return;
@@ -151,10 +162,12 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
         }
         try
         {
+            // 释放锁
             internals.releaseLock(lockData.lockPath);
         }
         finally
         {
+            // 移除对应的锁信息
             threadData.remove(currentThread);
         }
     }
@@ -191,7 +204,9 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
 
     InterProcessMutex(CuratorFramework client, String path, String lockName, int maxLeases, LockInternalsDriver driver)
     {
+        // 路径的验证
         basePath = PathUtils.validatePath(path);
+        // LockInternals 真正对锁的操作
         internals = new LockInternals(client, driver, path, lockName, maxLeases);
     }
 
@@ -211,27 +226,31 @@ public class InterProcessMutex implements InterProcessLock, Revocable<InterProce
         LockData lockData = threadData.get(Thread.currentThread());
         return lockData != null ? lockData.lockPath : null;
     }
-
+    // 获取锁操作
     private boolean internalLock(long time, TimeUnit unit) throws Exception
     {
         /*
            Note on concurrency: a given lockData instance
            can be only acted on by a single thread so locking isn't necessary
         */
-
+        // 当前线程
         Thread currentThread = Thread.currentThread();
-
+        // 当前线程对应的锁信息
         LockData lockData = threadData.get(currentThread);
+        // 如果有当前线程的锁信息,说明获取过锁,则直接重入
         if ( lockData != null )
         {
             // re-entering
             lockData.lockCount.incrementAndGet();
             return true;
         }
-
+        // 没有获取过锁,则尝试获取锁
+        // 如果获取到锁,则返回自己的path,否则返回null
         String lockPath = internals.attemptLock(time, unit, getLockNodeBytes());
+        // lockPath不为null,则保存获取到的锁信息
         if ( lockPath != null )
         {
+            // 创建LockData 保存对应的锁信息
             LockData newLockData = new LockData(currentThread, lockPath);
             threadData.put(currentThread, newLockData);
             return true;

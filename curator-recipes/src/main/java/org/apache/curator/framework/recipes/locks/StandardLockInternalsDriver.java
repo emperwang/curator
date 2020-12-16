@@ -28,29 +28,33 @@ import java.util.List;
 public class StandardLockInternalsDriver implements LockInternalsDriver
 {
     static private final Logger log = LoggerFactory.getLogger(StandardLockInternalsDriver.class);
-
+    // 获取锁
     @Override
     public PredicateResults getsTheLock(CuratorFramework client, List<String> children, String sequenceNodeName, int maxLeases) throws Exception
     {
+        // 判断要获取的序列节点在 排序后数组的位置
         int             ourIndex = children.indexOf(sequenceNodeName);
         validateOurIndex(sequenceNodeName, ourIndex);
-
+        // 如果是小于 macLeases,则说明获取到锁
         boolean         getsTheLock = ourIndex < maxLeases;
+        // 如果不是小于 maxLeases,则获取其前一个获取到锁的 节点
         String          pathToWatch = getsTheLock ? null : children.get(ourIndex - maxLeases);
-
+        // 返回结果,pathToWatch:要监听的节点  getsTheLock:是否获取到锁
         return new PredicateResults(pathToWatch, getsTheLock);
     }
-
+    // 创建锁,则创建一个 EPHEMERAL_SEQUENTIAL类型的序列 节点
     @Override
     public String createsTheLock(CuratorFramework client, String path, byte[] lockNodeBytes) throws Exception
     {
         String ourPath;
         if ( lockNodeBytes != null )
         {
+            // 有数据的创建节点
             ourPath = client.create().creatingParentContainersIfNeeded().withProtection().withMode(CreateMode.EPHEMERAL_SEQUENTIAL).forPath(path, lockNodeBytes);
         }
         else
         {
+            // 没有数据的节点创建
             ourPath = client.create().creatingParentContainersIfNeeded().withProtection().withMode(CreateMode.EPHEMERAL_SEQUENTIAL).forPath(path);
         }
         return ourPath;
