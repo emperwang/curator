@@ -57,7 +57,7 @@ public class InterProcessMultiLock implements InterProcessLock
     {
         this.locks = ImmutableList.copyOf(locks);
     }
-
+    // 多个锁的获取
     private static List<InterProcessLock> makeLocks(CuratorFramework client, List<String> paths)
     {
         ImmutableList.Builder<InterProcessLock> builder = ImmutableList.builder();
